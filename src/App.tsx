@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import { UploadCloud, Share2, Download, X, Wand2, Paintbrush } from 'lucide-react';
 import { cn } from './lib/utils';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { GalleryGridBlock } from './components/uitripled/gallery-grid-block-shadcnui';
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
-import { Search } from 'lucide-react';
 
 export default function App() {
   const [promptText, setPromptText] = useState('');
@@ -14,42 +11,82 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState('');
 
-  const modelName = 'Chrome Gen 1';
-  const artistName = 'Jane Doe';
-  const description = 'A bold fusion of cinematic noir photography and ethereal dreamscapes, blending stark contrasts of light and shadow with soft pastel gradients. Each piece captures the raw energy and timeless elegance of contemporary ink art, reimagined through a unique creative lens that transforms fleeting inspiration into something permanent and profound.';
-  const tags = ['cinematic', 'dramatic', 'surreal'];
-  const triggerWord = 'mystyle';
-  const status = 'online' as const;
+  const [modelName, setModelName] = useState('');
+  const [artistName, setArtistName] = useState('');
+  const [description, setDescription] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [triggerWord, setTriggerWord] = useState('');
+  const [status, setStatus] = useState<'idle' | 'training' | 'online'>('online');
+
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [models, setModels] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadMore = async () => {
+    if (!hasMore || isLoading) return;
+    
+    setIsLoading(true);
+    const res = await fetch(`https://d1-start.avi-kay2019.workers.dev/api/models?page=${page}&limit=50`);
+    const { data, pagination } = await res.json();
+    
+    setModels((prev: any[]) => [...prev, ...data]);
+    
+    if (page === 1 && data.length > 0) {
+      const firstModel = data[0];
+      setModelName(firstModel.model_name);
+      setArtistName(firstModel.artist_name);
+      setTriggerWord(firstModel.trigger_word);
+      setTags(firstModel.tags);
+      setDescription(firstModel.description);
+    }
+    
+    setHasMore(page < pagination.total_pages);
+    setPage(prev => prev + 1);
+    setIsLoading(false);
+  };
+
+  React.useEffect(() => {
+    loadMore();
+  }, []);
+
+  // Infinite Scroll Listener
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop 
+        >= document.documentElement.offsetHeight - 200
+      ) {
+        loadMore();
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMore, isLoading, page]);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      const formData = new FormData();
-      formData.append("prompt", promptText);
-      formData.append("colorMode", colorMode);
-      formData.append("style", styleInput);
-      formData.append("triggerWord", triggerWord);
-      formData.append("modelName", modelName);
-      formData.append("artistName", artistName);
-      if (uploadedRef) {
-        formData.append("referenceImage", uploadedRef);
-      }
+      const payload = {
+        user_story: promptText,
+        artistic_style: styleInput,
+        color_prefrence: colorMode
+      };
 
       const response = await fetch("/api/generate-image", {
         method: "POST",
-        body: formData
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
       });
       
       const data = await response.json();
-      if (data.success && data.imageUrl) {
-        setGeneratedImage(typeof data.imageUrl === 'string' ? data.imageUrl : JSON.stringify(data.imageUrl));
-      } else {
-        console.error("Failed to generate", data);
-        alert("Error generating image: " + (data.error || "Please check console"));
-      }
+      
+      // Directly set the raw string output from the server
+      setGeneratedImage(JSON.stringify(data));
     } catch (error) {
       console.error("Generation error:", error);
-      alert("Encountered an error while generating.");
     } finally {
       setIsGenerating(false);
     }
@@ -67,24 +104,62 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white text-black flex flex-col items-center justify-start relative pt-10 px-[10px]">
-      <div className="w-full max-w-[1400px] pb-24">
-        <GalleryGridBlock />
-      </div>
-
-      {/* Sticky Bottom Search */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-4">
-        <div className="bg-white/80 backdrop-blur-2xl border-2 border-black/10 shadow-2xl rounded-full p-2.5 flex items-center gap-3 w-full transition-all hover:bg-white focus-within:bg-white focus-within:border-black/20 focus-within:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)]">
-          <Search className="w-5 h-5 text-gray-400 ml-3" />
-          <input 
-            type="text" 
-            placeholder="Search the gallery..." 
-            className="flex-1 bg-transparent border-none outline-none text-sm text-black placeholder:text-gray-400 font-bold tracking-wider"
-          />
-          <KbdGroup className="pr-1">
-            <Kbd className="bg-gray-100 text-gray-500 border border-gray-200 shadow-sm">⌘</Kbd>
-            <Kbd className="bg-gray-100 text-gray-500 border border-gray-200 shadow-sm">K</Kbd>
-          </KbdGroup>
+      {/* INFINITE SCROLL GALLERY PLACEHOLDER */}
+      <div className="w-full max-w-7xl mx-auto mb-20">
+        <h2 className="text-2xl font-bold mb-6 text-left px-4">Model Gallery</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 px-4">
+          {models.map((model) => (
+            <div 
+              key={model.id} 
+              className="rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer bg-white group flex flex-col"
+              onClick={() => {
+                setModelName(model.model_name);
+                setArtistName(model.artist_name);
+                setTriggerWord(model.trigger_word);
+                setTags(model.tags);
+                setDescription(model.description);
+              }}
+            >
+              <div className="aspect-square w-full bg-gray-100 overflow-hidden relative">
+                {model.cover_image ? (
+                  <img 
+                    src={model.cover_image} 
+                    alt={model.model_name} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <Wand2 className="w-8 h-8 opacity-20" />
+                  </div>
+                )}
+                {/* Active Indicator */}
+                {modelName === model.model_name && (
+                  <div className="absolute top-3 right-3 bg-black text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider shadow-lg">
+                    Selected
+                  </div>
+                )}
+              </div>
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <h3 className="font-bold text-sm truncate uppercase tracking-wide">{model.model_name}</h3>
+                  <div className="flex items-center gap-1 text-yellow-500 shrink-0">
+                    <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>
+                    <span className="text-[10px] font-bold">{model.stars || 0}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider truncate mb-3">By {model.artist_name}</p>
+                <div className="flex flex-wrap gap-1 mt-auto">
+                  {(model.tags || []).slice(0, 2).map((tag: string) => (
+                    <span key={tag} className="text-[9px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md font-bold tracking-wider uppercase">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
+        
       </div>
 
       <Sheet>

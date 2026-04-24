@@ -39,108 +39,38 @@ async function startServer() {
 
   const upload = multer({ storage: multer.memoryStorage() });
 
-  app.post("/api/generate-image", upload.single("referenceImage"), async (req: any, res: any) => {
-    try {
-      const apiKey = process.env.DIFY_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ success: false, error: "DIFY_API_KEY not configured on server" });
+  app.post("/api/generate-image", express.json(), async (req: any, res: any) => {
+    const args = {
+      user_story: req.body.user_story,
+      artistic_style: req.body.artistic_style,
+      color_prefrence: req.body.color_prefrence
+    };
+
+    // Construct valid JSON-RPC payload for MCP server
+    const payload = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: {
+        name: "generate_image", // standard fallback for single-tool servers, adjust if needed
+        arguments: args
       }
+    };
 
-      let uploadFileId = null;
+    console.log("Calling MCP server with payload:", JSON.stringify(payload, null, 2));
 
-      // STEP 1: If reference image exists, upload to Dify Files
-      if (req.file) {
-        const formData = new FormData();
-        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-        formData.append("file", blob, req.file.originalname);
-        formData.append("user", "abc-123");
+    const mcpResponse = await fetch("https://api.dify.ai/mcp/server/GTzA5abY7oZKPAsG/mcp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
 
-        const uploadRes = await fetch("https://api.dify.ai/v1/files/upload", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: formData
-        });
-        
-        if (!uploadRes.ok) {
-          const errText = await uploadRes.text();
-          throw new Error(`Dify upload failed: ${uploadRes.status} - ${errText}`);
-        }
-        
-        const uploadData = await uploadRes.json();
-        uploadFileId = uploadData.id;
-        console.log(`Successfully uploaded image to Dify as ID: ${uploadFileId}`);
-      }
-
-      // STEP 2: Call Dify workflows/run
-      const payload: any = {
-        inputs: {
-          artist_prompt: req.body.prompt || "",
-          artist_version_id: req.body.modelName || "",
-          artist_style: req.body.style || "",
-          artist_color: req.body.colorMode || "",
-          artist_trigger_word: req.body.triggerWord || "",
-          user_id: "abc-123"
-        },
-        response_mode: "blocking",
-        user: "abc-123"
-      };
-
-      if (uploadFileId) {
-        payload.inputs.artist_image_input = {
-          transfer_method: "local_file",
-          upload_file_id: uploadFileId,
-          type: "image"
-        };
-      }
-
-      console.log("Calling Dify workflow with payload:", JSON.stringify(payload, null, 2));
-
-      const workflowRes = await fetch("https://api.dify.ai/v1/workflows/run", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!workflowRes.ok) {
-        const errText = await workflowRes.text();
-        throw new Error(`Dify workflow failed: ${workflowRes.status} - ${errText}`);
-      }
-
-      const workflowData = await workflowRes.json();
-      console.log("Dify workflow completed", workflowData);
-
-      // Extract image URL from response (it is usually in workflowData.data.outputs)
-      let imageUrl = null;
-      if (workflowData.data && workflowData.data.outputs) {
-        const outputs = workflowData.data.outputs;
-        // Search through outputs to find an image or string URL
-        for (const key of Object.keys(outputs)) {
-          const val = outputs[key];
-          if (typeof val === "string" && val.startsWith("http")) {
-            imageUrl = val;
-            break;
-          } else if (typeof val === "object" && val !== null && val.url) {
-            imageUrl = val.url; // In case they return a file object format
-            break;
-          } else if (typeof val === "object" && val !== null && val.image_url) {
-            imageUrl = val.image_url;
-            break;
-          }
-        }
-        // Fallback: If no explicit URL found, just pass the raw data so frontend can handle
-        if (!imageUrl) imageUrl = outputs; 
-      }
-
-      res.json({ success: true, imageUrl, rawOutputs: workflowData.data?.outputs });
-    } catch (error: any) {
-      console.error("Dify Generation Error:", error.message);
-      res.status(500).json({ success: false, error: error.message });
-    }
+    const data = await mcpResponse.json();
+    console.log("MCP Response:", data);
+    
+    res.json(data);
   });
 
   // Vite middleware for development
