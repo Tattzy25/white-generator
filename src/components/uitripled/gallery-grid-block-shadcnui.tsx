@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Grid, X, ZoomIn } from "lucide-react";
+import { ChevronLeft, ChevronRight, Grid, X, ZoomIn, Wand2, Paintbrush } from "lucide-react";
 import { KeyboardEvent, useState } from "react";
 
 export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onSelectModel: (model: any) => void }) {
@@ -64,7 +64,7 @@ export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onS
                 className="break-inside-avoid"
               >
                 <Card
-                  className="group relative cursor-pointer overflow-hidden border-none transition-all hover:shadow-2xl rounded-[40px] aspect-square"
+                  className="group relative cursor-pointer overflow-hidden border-none transition-all hover:shadow-2xl rounded-[40px] aspect-square focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
                   onClick={() => {
                     setSelectedImage(image.id);
                     onSelectModel(image);
@@ -76,8 +76,11 @@ export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onS
                 >
                   <div className="absolute inset-0 w-full h-full m-0 p-0">
                     <motion.img
-                      src={image.cover_image || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500"}
+                      src={image.cover_image}
                       alt={image.model_name}
+                      width={500}
+                      height={500}
+                      loading={index > 6 ? "lazy" : "eager"}
                       className="absolute inset-0 w-full h-full object-cover m-0 p-0"
                       whileHover={{ scale: 1.1 }}
                       transition={{ duration: 0.3 }}
@@ -91,7 +94,7 @@ export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onS
                       className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm m-0 p-0 px-4 text-center"
                       aria-hidden="true"
                     >
-                      <ZoomIn className="mb-2 h-8 w-8 text-[var(--muted-foreground)]" />
+                      <ZoomIn className="mb-2 h-8 w-8 text-[var(--muted-foreground)]" aria-hidden="true" />
                       <h3 className="mb-1 text-center text-lg font-semibold text-[var(--muted-foreground)] uppercase">
                         {image.model_name}
                       </h3>
@@ -127,37 +130,37 @@ export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onS
               <Button
                 size="icon"
                 variant="ghost"
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-50 text-[var(--muted-foreground)] hover:bg-white/10 hover:text-white"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-50 text-[var(--muted-foreground)] hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white"
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePrev();
                 }}
                 aria-label="View previous image"
               >
-                <ChevronLeft className="h-8 w-8" />
+                <ChevronLeft className="h-8 w-8" aria-hidden="true" />
               </Button>
               <Button
                 size="icon"
                 variant="ghost"
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-50 text-[var(--muted-foreground)] hover:bg-white/10 hover:text-white"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-50 text-[var(--muted-foreground)] hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleNext();
                 }}
                 aria-label="View next image"
               >
-                <ChevronRight className="h-8 w-8" />
+                <ChevronRight className="h-8 w-8" aria-hidden="true" />
               </Button>
 
               {/* Close Button */}
               <Button
                 size="icon"
                 variant="ghost"
-                className="absolute right-8 top-8 z-50 text-[var(--muted-foreground)] hover:bg-white/10 hover:text-white"
+                className="absolute right-8 top-8 z-50 text-[var(--muted-foreground)] hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white"
                 onClick={() => setSelectedImage(null)}
                 aria-label="Close gallery dialog"
               >
-                <X className="h-8 w-8" />
+                <X className="h-8 w-8" aria-hidden="true" />
               </Button>
 
               <motion.div
@@ -175,8 +178,10 @@ export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onS
                   style={{ backfaceVisibility: "hidden" }}
                 >
                   <img
-                    src={selectedImageData.cover_image || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500"}
+                    src={selectedImageData.cover_image}
                     alt={selectedImageData.model_name}
+                    width={1000}
+                    height={1000}
                     className="w-full h-full object-cover"
                   />
                   {/* Image Info Overlay on Front before it flips completely */}
@@ -192,27 +197,81 @@ export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onS
 
                 {/* Back of card (White Empty Canvas) */}
                 <div 
-                  className="absolute inset-0 w-full h-full bg-white rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center p-8"
+                  className="absolute inset-0 w-full h-full bg-[#fcfcfc] rounded-3xl shadow-2xl overflow-hidden border border-gray-200"
                   style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
                 >
-                  <div className="w-full h-full border-4 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center p-8 relative overflow-hidden">
-                     {/* Decorative corner markers */}
-                     <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-gray-300"></div>
-                     <div className="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-gray-300"></div>
-                     <div className="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-gray-300"></div>
-                     <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-gray-300"></div>
+                  {/* Subtle Grid Background */}
+                  <div className="absolute inset-0 opacity-[0.04] bg-[linear-gradient(to_right,#000_1px,transparent_1px),linear-gradient(to_bottom,#000_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>
+
+                  <div className="absolute inset-0 w-full h-full overflow-y-auto p-6 md:p-10 flex flex-col md:flex-row gap-6 z-10">
                      
-                     <h3 className="text-4xl font-black uppercase tracking-[0.2em] text-gray-200 mb-6 text-center">
-                       {selectedImageData.model_name}
-                     </h3>
-                     <div className="w-16 h-1 bg-gray-200 mb-10 rounded-full"></div>
-                     
-                     <div className="bg-gray-50 px-8 py-4 rounded-full border border-gray-100 shadow-sm animate-pulse">
-                       <p className="text-sm font-bold tracking-[0.3em] uppercase text-gray-400 text-center flex items-center gap-3">
-                         <Grid className="w-4 h-4" />
-                         Empty Canvas Ready
-                       </p>
+                     {/* Left Column: Info */}
+                     <div className="w-full md:w-1/2 lg:w-3/5 flex flex-col border-b md:border-b-0 md:border-r border-gray-200/50 pb-6 md:pb-0 md:pr-8 min-h-min">
+                        <div className="flex items-center gap-3 mb-6 shrink-0">
+                          <span className="px-3 py-1 bg-black text-white text-[10px] font-bold tracking-[0.2em] uppercase rounded-sm">
+                            Model Spec
+                          </span>
+                          <span className="text-[12px] font-medium tracking-[0.1em] text-gray-500 uppercase truncate">
+                            {selectedImageData.artist_name}
+                          </span>
+                        </div>
+                        
+                        <div className="flex flex-col items-start w-full mb-6 shrink-0">
+                          {selectedImageData.model_name.includes('/') ? (
+                            <>
+                              <h3 className="text-3xl md:text-4xl text-black leading-tight" style={{ fontFamily: "'Rock Salt', cursive" }}>
+                                {selectedImageData.model_name.split('/')[0]}
+                              </h3>
+                              <h3 className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter text-gray-900 leading-none mt-2 break-all" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                                /{selectedImageData.model_name.split('/').slice(1).join('/')}
+                              </h3>
+                            </>
+                          ) : (
+                            <h3 className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter text-gray-900 leading-tight break-words" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                              {selectedImageData.model_name}
+                            </h3>
+                          )}
+                        </div>
+
+                        <div className="mt-auto shrink-0">
+                          <p className="text-gray-500 text-sm leading-relaxed md:max-w-md">
+                            {selectedImageData.description}
+                          </p>
+                        </div>
                      </div>
+
+                     {/* Right Column: Action & Abstract Element */}
+                     <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col items-center justify-center gap-6 md:gap-8 min-h-min">
+                        
+                        <div className="relative w-24 h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 border border-gray-200 rounded-full flex items-center justify-center shrink-0 bg-white shadow-sm">
+                          <div className="absolute inset-2 border border-dashed border-gray-300 rounded-full animate-[spin_40s_linear_infinite]"></div>
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-black rounded-full text-white flex items-center justify-center shadow-lg z-10 transition-transform duration-700 hover:scale-110">
+                            <Wand2 className="w-4 h-4 md:w-5 md:h-5" aria-hidden="true" />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-center w-full gap-3 shrink-0">
+                          <Button 
+                            className="w-full max-w-[240px] bg-black hover:bg-gray-800 text-white rounded-xl py-6 md:py-7 text-xs font-bold tracking-[0.2em] uppercase shadow-xl transition-all hover:-translate-y-1 hover:shadow-black/20 focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 group flex items-center justify-center gap-2"
+                            onClick={() => {
+                              setSelectedImage(null);
+                              setTimeout(() => {
+                                const sheetTrigger = document.querySelector('[data-state="closed"]');
+                                if (sheetTrigger instanceof HTMLElement) {
+                                  sheetTrigger.click();
+                                }
+                              }, 150);
+                            }}
+                          >
+                            <Paintbrush className="w-4 h-4 group-hover:rotate-12 transition-transform" aria-hidden="true" />
+                            Create Now
+                          </Button>
+                          <span className="text-[9px] md:text-[10px] font-bold tracking-[0.1em] uppercase text-gray-400 text-center">
+                            Launch Studio Environment
+                          </span>
+                        </div>
+                     </div>
+
                   </div>
                 </div>
               </motion.div>

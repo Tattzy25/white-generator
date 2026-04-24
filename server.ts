@@ -40,37 +40,30 @@ async function startServer() {
   const upload = multer({ storage: multer.memoryStorage() });
 
   app.post("/api/generate-image", express.json(), async (req: any, res: any) => {
-    const args = {
-      user_story: req.body.user_story,
-      artistic_style: req.body.artistic_style,
-      color_prefrence: req.body.color_prefrence
-    };
-
-    // Construct valid JSON-RPC payload for MCP server
-    const payload = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: {
-        name: "generate_image", // standard fallback for single-tool servers, adjust if needed
-        arguments: args
-      }
-    };
+    const payload = req.body;
 
     console.log("Calling MCP server with payload:", JSON.stringify(payload, null, 2));
 
-    const mcpResponse = await fetch("https://api.dify.ai/mcp/server/GTzA5abY7oZKPAsG/mcp", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
+    try {
+      const mcpResponse = await fetch("https://api.dify.ai/mcp/server/9d1qVyjk5O2fsgOc/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
 
-    const data = await mcpResponse.json();
-    console.log("MCP Response:", data);
-    
-    res.json(data);
+      if (!mcpResponse.ok) {
+        throw new Error(`MCP Server responded with status: ${mcpResponse.status}`);
+      }
+
+      const data = await mcpResponse.json();
+      console.log("MCP Response:", data);
+      res.json(data);
+    } catch (error: any) {
+      console.error("MCP Server Request Error:", error);
+      res.status(500).json({ error: { message: error.message } });
+    }
   });
 
   // Vite middleware for development

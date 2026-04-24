@@ -1,81 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UploadCloud, Share2, Download, X, Wand2, Paintbrush } from 'lucide-react';
 import { cn } from './lib/utils';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { GalleryGridBlock } from './components/uitripled/gallery-grid-block-shadcnui';
+import { toast } from 'sonner';
+import { useModels, ModelData } from './hooks/useModels';
 
 export default function App() {
   const [promptText, setPromptText] = useState('');
   const [colorMode, setColorMode] = useState('color');
-  const [styleInput, setStyleInput] = useState('');
+  const [numOutputs, setNumOutputs] = useState('1');
   const [uploadedRef, setUploadedRef] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState('');
 
-  const [modelName, setModelName] = useState('');
-  const [artistName, setArtistName] = useState('');
-  const [description, setDescription] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [triggerWord, setTriggerWord] = useState('');
+  const [selectedModel, setSelectedModel] = useState<ModelData | null>(null);
   const [status, setStatus] = useState<'idle' | 'training' | 'online'>('online');
 
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [models, setModels] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { models, loadMore, hasMore, isLoading, error } = useModels();
 
-  const loadMore = async () => {
-    if (!hasMore || isLoading) return;
-    
-    setIsLoading(true);
-    const res = await fetch(`https://d1-start.avi-kay2019.workers.dev/api/models?page=${page}&limit=50`);
-    const { data, pagination } = await res.json();
-    
-    setModels((prev: any[]) => {
-      const existingIds = new Set(prev.map(m => m.id));
-      const uniqueData = data.filter((m: any) => !existingIds.has(m.id));
-      return [...prev, ...uniqueData];
-    });
-    
-    if (page === 1 && data.length > 0) {
-      const firstModel = data[0];
-      setModelName(firstModel.model_name);
-      setArtistName(firstModel.artist_name);
-      setTriggerWord(firstModel.trigger_word);
-      setTags(firstModel.tags);
-      setDescription(firstModel.description);
+  // Set initial selected model when data first loads
+  useEffect(() => {
+    if (models.length > 0 && !selectedModel) {
+      setSelectedModel(models[0]);
     }
-    
-    setHasMore(page < pagination.total_pages);
-    setPage(prev => prev + 1);
-    setIsLoading(false);
-  };
-
-  React.useEffect(() => {
-    loadMore();
-  }, []);
+  }, [models, selectedModel]);
 
   // Infinite Scroll Listener
-  React.useEffect(() => {
+  useEffect(() => {
     const handleScroll = () => {
       if (
         window.innerHeight + document.documentElement.scrollTop 
         >= document.documentElement.offsetHeight - 200
       ) {
-        loadMore();
+        if (!isLoading && hasMore) {
+          loadMore();
+        }
       }
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMore, isLoading, page]);
+  }, [hasMore, isLoading, loadMore]);
 
-  const handleGenerate = async () => {
+  const handleGenerateImage = async () => {
+    if (!selectedModel) {
+      toast.error("No model selected.");
+      return;
+    }
+    if (!selectedModel.gen_id) {
+      toast.error("Missing gen_id from database.");
+      return;
+    }
+    if (!promptText.trim()) {
+      toast.error("Prompt is required.");
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      const payload = {
-        user_story: promptText,
-        artistic_style: styleInput,
-        color_prefrence: colorMode
+      const mcpPayload = {
+        jsonrpc: "2.0",
+        id: selectedModel.gen_id,
+        method: "tools/call",
+        params: {
+          name: "artists_n_models",
+          arguments: {
+            user_id: selectedModel.user_id,
+            gen_id: selectedModel.gen_id,
+            version: selectedModel.version,
+            prompt: promptText.trim(),
+            color: colorMode,
+            num_outputs: parseInt(numOutputs) || 1,
+          },
+        },
       };
 
       const response = await fetch("/api/generate-image", {
@@ -83,26 +80,43 @@ export default function App() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(mcpPayload)
       });
-      
+
+      if (!response.ok) {
+        throw new Error(`Server connection issue. Please try again.`);
+      }
+
       const data = await response.json();
-      
-      // Directly set the raw string output from the server
-      setGeneratedImage(JSON.stringify(data));
-    } catch (error) {
+
+      if (data.error) {
+        throw new Error("Unable to complete generation. Please try again.");
+      }
+
+      const resultText = data.result?.content?.[0]?.text;
+      if (resultText) {
+        setGeneratedImage(resultText);
+        toast.success("Image Generated Successfully");
+      } else {
+        // Fallback or debug, but display a friendly success if JSON-RPC responds positively without the exact shape
+        setGeneratedImage(JSON.stringify(data));
+        toast.success("Creation process completed");
+      }
+      refetch(); // Refetch after successful generation
+    } catch (error: any) {
       console.error("Generation error:", error);
+      toast.error(error.message || "System error. Please try again later.");
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleShareEmbed = async () => {
-    if (navigator.share) {
+    if (navigator.share && selectedModel?.model_name) {
       await navigator.share({
-        title: modelName,
+        title: selectedModel.model_name,
         text: 'Embed this generator on your site',
-        url: `${window.location.origin}/embed/${modelName.toLowerCase().replace(/\s+/g, '-')}`,
+        url: `${window.location.origin}/embed/${selectedModel.model_name.toLowerCase().replace(/\s+/g, '-')}`,
       });
     }
   };
@@ -110,15 +124,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white text-black flex flex-col items-center justify-start relative pt-10 px-[10px]">
       <div className="w-full max-w-[1400px] pb-24">
-        <GalleryGridBlock 
-          models={models} 
+        <GalleryGridBlock
+          models={models}
           onSelectModel={(model) => {
-            setModelName(model.model_name);
-            setArtistName(model.artist_name);
-            setTriggerWord(model.trigger_word);
-            setTags(model.tags);
-            setDescription(model.description);
-          }} 
+            setSelectedModel(model);
+          }}
         />
       </div>
 
@@ -142,53 +152,53 @@ export default function App() {
                 className="w-full rounded-[40px] overflow-hidden bg-white shadow-2xl flex flex-col"
               >
                 {/* Header */}
-                <div className="h-[80px] w-full bg-white flex items-center justify-center border-none shrink-0 px-6 gap-6 text-center overflow-hidden whitespace-nowrap flex-nowrap leading-none border-b-2 border-black/5 shadow-sm">
+                <div className="h-[80px] w-full bg-white flex items-center justify-center border-none shrink-0 px-6 gap-6 text-center overflow-hidden whitespace-nowrap flex-nowrap leading-[0.8] border-b-2 border-black/5 shadow-sm">
                   {/* Model Name Area */}
                   <div className="flex flex-col items-start gap-1 shrink-0">
-                    <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-none">Model</span>
-                    {modelName.includes('/') ? (
+                    <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-[0.8] pb-1">Model</span>
+                    {selectedModel?.model_name?.includes('/') ? (
                       <div className="flex items-baseline gap-0.5">
-                        <span 
-                          className="text-[20px] text-black leading-none" 
+                        <span
+                          className="text-[26px] text-black leading-[0.8]"
                           style={{ fontFamily: "'Rock Salt', cursive" }}
                         >
-                          {modelName.split('/')[0]}
+                          {selectedModel.model_name.split('/')[0]}
                         </span>
-                        <span 
-                          className="text-[24px] font-bold text-gray-800 leading-none uppercase"
+                        <span
+                          className="text-[32px] font-bold text-gray-800 leading-[0.8] uppercase"
                           style={{ fontFamily: "'Orbitron', sans-serif" }}
                         >
-                          /{modelName.split('/').slice(1).join('/')}
+                          /{selectedModel.model_name.split('/').slice(1).join('/')}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-[24px] font-bold text-gray-800 uppercase shrink-0 leading-none py-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>{modelName}</span>
+                      <span className="text-[32px] font-bold text-gray-800 uppercase shrink-0 leading-[0.8]" style={{ fontFamily: "'Orbitron', sans-serif" }}>{selectedModel?.model_name || 'Select Model'}</span>
                     )}
                   </div>
 
-                  {artistName && (
+                  {selectedModel?.artist_name && (
                     <>
                       <div className="w-[1px] h-10 bg-gray-200 shrink-0"></div>
                       <div className="flex flex-col items-start gap-1 shrink-0">
-                        <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-none">Artist</span>
-                        <span 
-                          className="text-[20px] text-black leading-none"
+                        <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-[0.8] pb-1">Artist</span>
+                        <span
+                          className="text-[26px] text-black leading-[0.8]"
                           style={{ fontFamily: "'Rock Salt', cursive" }}
                         >
-                          {artistName}
+                          {selectedModel.artist_name}
                         </span>
                       </div>
                     </>
                   )}
 
-                  {tags && tags.length > 0 && (
+                  {selectedModel?.tags && selectedModel.tags.length > 0 && (
                     <>
                       <div className="w-[1px] h-10 bg-gray-200 shrink-0"></div>
                       <div className="flex flex-col items-start gap-1 shrink-0">
-                        <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-none">Tags</span>
-                        <div className="flex items-center gap-2 shrink-0 flex-nowrap whitespace-nowrap">
-                          {tags.slice(0, 2).map((tag, i) => (
-                            <span key={`${tag}-${i}`} className="text-[14px] font-black tracking-widest text-gray-500 uppercase leading-none px-2 py-1 bg-gray-50 rounded-md border border-gray-100">
+                        <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-[0.8] pb-1">Tags</span>
+                        <div className="flex items-center gap-2 shrink-0 flex-nowrap whitespace-nowrap pt-1">
+                          {selectedModel.tags.slice(0, 2).map((tag, i) => (
+                            <span key={`${tag}-${i}`} className="text-[18px] font-black tracking-widest text-gray-500 uppercase leading-[0.8] px-2 py-0.5 bg-gray-50 rounded border border-gray-100">
                               {tag}
                             </span>
                           ))}
@@ -199,28 +209,47 @@ export default function App() {
                   
                   <div className="w-[1px] h-10 bg-gray-200 shrink-0"></div>
                   <div className="flex flex-col items-start gap-1 shrink-0">
-                    <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-none">Rating</span>
-                    <div className="flex items-center gap-1 shrink-0 mt-1">
+                    <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-[0.8] pb-1">Most Loved</span>
+                    <div className="flex items-center gap-1 shrink-0 pt-1">
                       {[1,2,3,4,5].map((star) => (
-                        <svg key={star} className="w-[18px] h-[18px] text-black fill-current shrink-0" viewBox="0 0 20 20">
+                        <svg key={star} className="w-[24px] h-[24px] text-yellow-400 fill-current shrink-0" viewBox="0 0 20 20">
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                         </svg>
                       ))}
                     </div>
                   </div>
                 </div>
-                <div className="w-full flex flex-col lg:flex-row items-stretch gap-8 xl:gap-10 p-[10px]">
-            {/* LEFT - ARTIST CARD */}
-            <div className="w-full lg:w-[280px] xl:w-[300px] flex-shrink-0 self-stretch animate-in slide-in-from-left-8 duration-700">
-              <div className="h-full">
-                <ArtistCard
-                  modelName={modelName}
-                  artistName={artistName}
-                  description={description}
-                  tags={tags}
-                  status={status}
-                  showStars={true}
-                />
+                <div className="w-full flex flex-col lg:flex-row justify-center items-stretch gap-8 xl:gap-10 p-[10px] h-full relative">
+            {/* LEFT - VERTICAL MODEL CAROUSEL (OVERLAY) */}
+            <div className="absolute -left-[170px] top-1/2 -translate-y-1/2 w-[150px] h-[560px] z-50 hidden lg:flex flex-col">
+              <div 
+                className="w-full h-full overflow-y-auto hide-scrollbar flex flex-col gap-4 py-8"
+                style={{ 
+                  maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
+                }}
+              >
+                {models.map((m: any, idx: number) => (
+                  <button
+                    key={m._reactKey || `${m.id}-${idx}`}
+                    onClick={() => {
+                      setSelectedModel(m);
+                    }}
+                    className={cn(
+                      "w-[150px] h-[150px] flex-shrink-0 rounded-[24px] overflow-hidden border-4 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black hover:scale-105 shadow-xl",
+                      selectedModel?.model_name === m.model_name ? "border-black opacity-100 scale-105" : "border-transparent opacity-80 hover:opacity-100"
+                    )}
+                  >
+                    <img 
+                      src={m.cover_image || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150"} 
+                      alt={m.model_name}
+                      width={150}
+                      height={150}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -229,16 +258,18 @@ export default function App() {
               <div className="w-full flex flex-col gap-4 flex-1">
                 {/* Trigger Word */}
                 <div>
-                  <label className="block text-[14px] font-bold tracking-[0.2em] text-black mb-2 uppercase text-center">Trigger Word</label>
+                  <div className="block text-[14px] font-bold tracking-[0.2em] text-black mb-2 uppercase text-center">Trigger Word</div>
                   <div className="text-center py-2.5 px-4 rounded-xl bg-gray-50 border-2 border-gray-200">
-                    <span className="text-[18px] font-bold tracking-wider text-black">{triggerWord}</span>
+                    <span className="text-[18px] font-bold tracking-wider text-black">{selectedModel?.trigger_word || 'None'}</span>
                   </div>
                 </div>
 
                 {/* Prompt Input */}
                 <div>
-                  <label className="block text-[14px] font-bold tracking-[0.2em] text-black mb-2 uppercase text-center">Describe Your Style</label>
+                  <label htmlFor="promptText" className="block text-[14px] font-bold tracking-[0.2em] text-black mb-2 uppercase text-center">Describe Your Style</label>
                   <textarea
+                    id="promptText"
+                    name="promptText"
                     value={promptText}
                     onChange={(e) => setPromptText(e.target.value)}
                     rows={4}
@@ -252,7 +283,7 @@ export default function App() {
                 <div className="flex items-center justify-between gap-6">
                   {/* Color Mode */}
                   <div className="flex flex-col items-center gap-2">
-                    <label className="text-[14px] font-bold tracking-[0.2em] text-black uppercase">Color Mode</label>
+                    <div className="text-[14px] font-bold tracking-[0.2em] text-black uppercase">Color Mode</div>
                     <div className="flex items-center gap-2">
                       {['color', 'black'].map((mode) => (
                         <label key={mode} className={cn(
@@ -272,17 +303,27 @@ export default function App() {
                       ))}
                     </div>
                   </div>
-                  {/* Style Input */}
+                  {/* Number Outputs Input */}
                   <div className="flex flex-col items-center gap-2">
-                    <label className="text-[14px] font-bold tracking-[0.2em] text-black uppercase">Style</label>
-                    <input
-                      type="text"
-                      value={styleInput}
-                      onChange={(e) => setStyleInput(e.target.value)}
-                      style={{ borderColor: '#000000', borderStyle: 'outset', borderWidth: '3px' }}
-                      className="w-44 px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-black/5 outline-none transition-all text-black text-[16px] font-medium placeholder:text-gray-300 bg-transparent"
-                      placeholder="e.g. cinematic"
-                    />
+                    <div className="text-[14px] font-bold tracking-[0.2em] text-black uppercase">Number Outputs</div>
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4].map((num) => (
+                        <label key={num} className={cn(
+                          'flex items-center gap-1.5 cursor-pointer w-10 h-10 justify-center rounded-full transition-all',
+                          numOutputs === String(num) ? 'bg-black text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        )}>
+                          <input
+                            type="radio"
+                            name="numOutputs"
+                            value={num}
+                            checked={numOutputs === String(num)}
+                            onChange={(e) => setNumOutputs(e.target.value)}
+                            className="sr-only"
+                          />
+                          <span className="text-[14px] font-bold">{num}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -330,14 +371,16 @@ export default function App() {
                 <div className="flex-1" />
 
                 {/* CREATE BUTTON */}
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="w-full bg-black text-white rounded-xl py-4 font-bold text-[14px] tracking-[0.25em] uppercase hover:bg-gray-900 active:scale-[0.98] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <Wand2 className="w-5 h-5" />
-                  {isGenerating ? 'CREATING...' : 'CREATE MY IMAGE'}
-                </button>
+                {selectedModel && (
+                  <button
+                    onClick={handleGenerateImage}
+                    disabled={isGenerating || !promptText.trim()}
+                    className="w-full bg-black text-white rounded-xl py-4 font-bold text-[14px] tracking-[0.25em] uppercase hover:bg-gray-900 active:scale-[0.98] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <Wand2 className="w-5 h-5" />
+                    {isGenerating ? 'CREATING...' : 'CREATE MY IMAGE'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -485,52 +528,5 @@ function ArtistCard({
     .filter(Boolean)
     .slice(0, 3);
 
-  return (
-    <div className="w-full max-w-[320px] rounded-[32px] bg-white shadow-2xl border border-gray-100 overflow-hidden">
-      <div className="p-6 space-y-4">
-        {/* Star Rating */}
-        {showStars && (
-          <div className="flex items-center justify-center gap-1 pb-2">
-            {[1,2,3,4,5].map((star) => (
-              <svg key={star} className="w-5 h-5 text-yellow-400 fill-current" viewBox="0 0 20 20">
-                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
-              </svg>
-            ))}
-          </div>
-        )}
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[14px] font-bold tracking-[0.2em] uppercase text-gray-400">Model</p>
-            <h3 className="text-[22px] font-black uppercase truncate">{modelName}</h3>
-            <p className="text-[14px] font-bold tracking-[0.2em] uppercase text-gray-400 mt-2">Artist</p>
-            <p className="text-[18px] font-black uppercase truncate">{artistName || '—'}</p>
-          </div>
-
-          <div className={cn('px-3 py-1 rounded-full text-[14px] font-bold tracking-[0.2em] uppercase flex-shrink-0', statusClass)}>
-            {statusLabel}
-          </div>
-        </div>
-
-        {visibleTags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {visibleTags.map((tag, i) => (
-              <span
-                key={`${tag}-${i}`}
-                className="px-3 py-1 rounded-full text-[14px] font-bold tracking-[0.2em] uppercase bg-gray-100 text-gray-700"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="space-y-1">
-          <p className="text-[14px] font-bold tracking-[0.2em] uppercase text-gray-400">Description</p>
-          <pre className="text-[16px] text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">
-            {description?.length ? description : '—'}
-          </pre>
-        </div>
-      </div>
-    </div>
-  );
+  return null; // Component removed from rendering layout pending further instructions
 }
