@@ -31,7 +31,11 @@ export default function App() {
     const res = await fetch(`https://d1-start.avi-kay2019.workers.dev/api/models?page=${page}&limit=50`);
     const { data, pagination } = await res.json();
     
-    setModels((prev: any[]) => [...prev, ...data]);
+    setModels((prev: any[]) => {
+      const existingIds = new Set(prev.map(m => m.id));
+      const uniqueData = data.filter((m: any) => !existingIds.has(m.id));
+      return [...prev, ...uniqueData];
+    });
     
     if (page === 1 && data.length > 0) {
       const firstModel = data[0];
@@ -122,7 +126,7 @@ export default function App() {
         <SheetTrigger asChild>
           <button className="fixed top-1/2 right-0 -translate-y-1/2 bg-black text-white p-4 rounded-l-2xl shadow-2xl hover:bg-gray-900 transition-all z-50 flex flex-col items-center gap-2 group border-y border-l border-white/20">
              <Paintbrush className="w-6 h-6 group-hover:-rotate-12 transition-transform" />
-             <span className="text-[10px] font-bold tracking-[0.2em] uppercase" style={{ writingMode: 'vertical-rl' }}>Studio</span>
+             <span className="text-[14px] font-bold tracking-[0.2em] uppercase" style={{ writingMode: 'vertical-rl' }}>Studio</span>
           </button>
         </SheetTrigger>
         <SheetContent side="right" className="!w-screen !max-w-[100vw] !h-screen p-0 border-none overflow-hidden bg-black/10 backdrop-blur-3xl m-0 rounded-none inset-y-0 right-0 !duration-1000 data-[state=open]:!duration-1000 data-[state=closed]:!duration-1000 transition-all ease-in-out">
@@ -135,8 +139,76 @@ export default function App() {
             <div className="w-full mx-auto animate-in fade-in duration-500 flex flex-col">
               <div
                 style={{ borderColor: '#000000', borderStyle: 'outset', borderWidth: '3px' }}
-                className="w-full rounded-[40px] overflow-hidden bg-white shadow-2xl"
+                className="w-full rounded-[40px] overflow-hidden bg-white shadow-2xl flex flex-col"
               >
+                {/* Header */}
+                <div className="h-[80px] w-full bg-white flex items-center justify-center border-none shrink-0 px-6 gap-6 text-center overflow-hidden whitespace-nowrap flex-nowrap leading-none border-b-2 border-black/5 shadow-sm">
+                  {/* Model Name Area */}
+                  <div className="flex flex-col items-start gap-1 shrink-0">
+                    <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-none">Model</span>
+                    {modelName.includes('/') ? (
+                      <div className="flex items-baseline gap-0.5">
+                        <span 
+                          className="text-[20px] text-black leading-none" 
+                          style={{ fontFamily: "'Rock Salt', cursive" }}
+                        >
+                          {modelName.split('/')[0]}
+                        </span>
+                        <span 
+                          className="text-[24px] font-bold text-gray-800 leading-none uppercase"
+                          style={{ fontFamily: "'Orbitron', sans-serif" }}
+                        >
+                          /{modelName.split('/').slice(1).join('/')}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[24px] font-bold text-gray-800 uppercase shrink-0 leading-none py-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>{modelName}</span>
+                    )}
+                  </div>
+
+                  {artistName && (
+                    <>
+                      <div className="w-[1px] h-10 bg-gray-200 shrink-0"></div>
+                      <div className="flex flex-col items-start gap-1 shrink-0">
+                        <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-none">Artist</span>
+                        <span 
+                          className="text-[20px] text-black leading-none"
+                          style={{ fontFamily: "'Rock Salt', cursive" }}
+                        >
+                          {artistName}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {tags && tags.length > 0 && (
+                    <>
+                      <div className="w-[1px] h-10 bg-gray-200 shrink-0"></div>
+                      <div className="flex flex-col items-start gap-1 shrink-0">
+                        <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-none">Tags</span>
+                        <div className="flex items-center gap-2 shrink-0 flex-nowrap whitespace-nowrap">
+                          {tags.slice(0, 2).map((tag, i) => (
+                            <span key={`${tag}-${i}`} className="text-[14px] font-black tracking-widest text-gray-500 uppercase leading-none px-2 py-1 bg-gray-50 rounded-md border border-gray-100">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
+                  <div className="w-[1px] h-10 bg-gray-200 shrink-0"></div>
+                  <div className="flex flex-col items-start gap-1 shrink-0">
+                    <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-gray-400 leading-none">Rating</span>
+                    <div className="flex items-center gap-1 shrink-0 mt-1">
+                      {[1,2,3,4,5].map((star) => (
+                        <svg key={star} className="w-[18px] h-[18px] text-black fill-current shrink-0" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                        </svg>
+                      ))}
+                    </div>
+                  </div>
+                </div>
                 <div className="w-full flex flex-col lg:flex-row items-stretch gap-8 xl:gap-10 p-[10px]">
             {/* LEFT - ARTIST CARD */}
             <div className="w-full lg:w-[280px] xl:w-[300px] flex-shrink-0 self-stretch animate-in slide-in-from-left-8 duration-700">
@@ -157,21 +229,21 @@ export default function App() {
               <div className="w-full flex flex-col gap-4 flex-1">
                 {/* Trigger Word */}
                 <div>
-                  <label className="block text-[10px] font-bold tracking-[0.2em] text-black mb-2 uppercase text-center">Trigger Word</label>
+                  <label className="block text-[14px] font-bold tracking-[0.2em] text-black mb-2 uppercase text-center">Trigger Word</label>
                   <div className="text-center py-2.5 px-4 rounded-xl bg-gray-50 border-2 border-gray-200">
-                    <span className="text-sm font-bold tracking-wider text-black">{triggerWord}</span>
+                    <span className="text-[18px] font-bold tracking-wider text-black">{triggerWord}</span>
                   </div>
                 </div>
 
                 {/* Prompt Input */}
                 <div>
-                  <label className="block text-[10px] font-bold tracking-[0.2em] text-black mb-2 uppercase text-center">Describe Your Style</label>
+                  <label className="block text-[14px] font-bold tracking-[0.2em] text-black mb-2 uppercase text-center">Describe Your Style</label>
                   <textarea
                     value={promptText}
                     onChange={(e) => setPromptText(e.target.value)}
                     rows={4}
                     style={{ borderColor: '#000000', borderStyle: 'outset', borderWidth: '3px' }}
-                    className="w-full p-3 rounded-xl focus:ring-2 focus:ring-black/5 outline-none transition-all text-black text-left font-medium placeholder:text-gray-300 bg-transparent resize-none text-sm"
+                    className="w-full p-3 rounded-xl focus:ring-2 focus:ring-black/5 outline-none transition-all text-black text-left font-medium placeholder:text-gray-300 bg-transparent resize-none text-[18px]"
                     placeholder="A cinematic portrait..."
                   />
                 </div>
@@ -180,7 +252,7 @@ export default function App() {
                 <div className="flex items-center justify-between gap-6">
                   {/* Color Mode */}
                   <div className="flex flex-col items-center gap-2">
-                    <label className="text-[10px] font-bold tracking-[0.2em] text-black uppercase">Color Mode</label>
+                    <label className="text-[14px] font-bold tracking-[0.2em] text-black uppercase">Color Mode</label>
                     <div className="flex items-center gap-2">
                       {['color', 'black'].map((mode) => (
                         <label key={mode} className={cn(
@@ -195,20 +267,20 @@ export default function App() {
                             onChange={() => setColorMode(mode)}
                             className="sr-only"
                           />
-                          <span className="text-[10px] font-bold tracking-wider uppercase">{mode === 'black' ? 'B&W' : 'Color'}</span>
+                          <span className="text-[14px] font-bold tracking-wider uppercase">{mode === 'black' ? 'B&W' : 'Color'}</span>
                         </label>
                       ))}
                     </div>
                   </div>
                   {/* Style Input */}
                   <div className="flex flex-col items-center gap-2">
-                    <label className="text-[10px] font-bold tracking-[0.2em] text-black uppercase">Style</label>
+                    <label className="text-[14px] font-bold tracking-[0.2em] text-black uppercase">Style</label>
                     <input
                       type="text"
                       value={styleInput}
                       onChange={(e) => setStyleInput(e.target.value)}
                       style={{ borderColor: '#000000', borderStyle: 'outset', borderWidth: '3px' }}
-                      className="w-44 px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-black/5 outline-none transition-all text-black text-xs font-medium placeholder:text-gray-300 bg-transparent"
+                      className="w-44 px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-black/5 outline-none transition-all text-black text-[16px] font-medium placeholder:text-gray-300 bg-transparent"
                       placeholder="e.g. cinematic"
                     />
                   </div>
@@ -225,8 +297,8 @@ export default function App() {
                         <img src={URL.createObjectURL(uploadedRef)} alt="Reference" className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 text-left">
-                        <div className="font-bold text-xs tracking-wider uppercase text-black truncate">{uploadedRef.name}</div>
-                        <div className="text-[10px] text-green-600 uppercase tracking-wider font-bold">Image Ready</div>
+                        <div className="font-bold text-[16px] tracking-wider uppercase text-black truncate">{uploadedRef.name}</div>
+                        <div className="text-[14px] text-green-600 uppercase tracking-wider font-bold">Image Ready</div>
                       </div>
                       <button
                         type="button"
@@ -244,8 +316,8 @@ export default function App() {
                     style={{ borderColor: '#000000', borderStyle: 'outset', borderWidth: '3px' }}
                   >
                     <UploadCloud className="w-8 h-8 mb-1 text-gray-400" />
-                    <div className="font-bold text-xs tracking-[0.2em] uppercase text-black">REFERENCE IMAGE</div>
-                    <div className="text-[10px] text-gray-500 uppercase tracking-wider">.PNG, .JPG, .WEBP</div>
+                    <div className="font-bold text-[16px] tracking-[0.2em] uppercase text-black">REFERENCE IMAGE</div>
+                    <div className="text-[14px] text-gray-500 uppercase tracking-wider">.PNG, .JPG, .WEBP</div>
                   </button>
                 )}
                 <input id="upload-input" type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -261,7 +333,7 @@ export default function App() {
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="w-full bg-black text-white rounded-xl py-4 font-bold text-[10px] tracking-[0.25em] uppercase hover:bg-gray-900 active:scale-[0.98] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full bg-black text-white rounded-xl py-4 font-bold text-[14px] tracking-[0.25em] uppercase hover:bg-gray-900 active:scale-[0.98] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <Wand2 className="w-5 h-5" />
                   {isGenerating ? 'CREATING...' : 'CREATE MY IMAGE'}
@@ -272,7 +344,7 @@ export default function App() {
             {/* RIGHT - RENDERS */}
             <div className="w-full lg:flex-1 animate-in slide-in-from-right-8 duration-700 delay-300 fill-mode-both">
               <div className="w-full flex flex-col h-full">
-                <div className="w-full flex flex-col h-[500px]">
+                <div className="w-full flex flex-col h-[560px]">
                   {/* Action Icons */}
                   <div className={cn(
                     "flex items-center justify-center gap-3 transition-all duration-300",
@@ -337,20 +409,20 @@ export default function App() {
                         {isGenerating ? (
                           <div className="flex flex-col items-center gap-4">
                             <div className="w-20 h-20 border-4 border-black border-t-transparent rounded-full animate-spin" />
-                            <p className="text-sm font-bold tracking-[0.2em] uppercase text-gray-500">Creating Magic...</p>
+                            <p className="text-[18px] font-bold tracking-[0.2em] uppercase text-gray-500">Creating Magic...</p>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-3">
                             <Wand2 className="w-20 h-20 text-gray-200" />
-                            <p className="text-xs font-bold tracking-[0.15em] uppercase text-gray-400 text-center">Your image here</p>
+                            <p className="text-[16px] font-bold tracking-[0.15em] uppercase text-gray-400 text-center">Your image here</p>
                           </div>
                         )}
                       </div>
                     )}
                     {/* Edit Image Button */}
                     {generatedImage && (
-                      <button
-                        className="mt-3 bg-black text-white rounded-full px-4 py-2.5 font-bold text-[10px] tracking-wider uppercase hover:bg-gray-900 active:scale-[0.98] transition-all flex items-center gap-2"
+                        <button
+                          className="mt-3 bg-black text-white rounded-full px-4 py-2.5 font-bold text-[14px] tracking-wider uppercase hover:bg-gray-900 active:scale-[0.98] transition-all flex items-center gap-2"
                         onClick={async () => {
                           try {
                             const response = await fetch(generatedImage);
@@ -428,23 +500,23 @@ function ArtistCard({
         )}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400">Model</p>
-            <h3 className="text-lg font-black uppercase truncate">{modelName}</h3>
-            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 mt-2">Artist</p>
-            <p className="text-sm font-black uppercase truncate">{artistName || '—'}</p>
+            <p className="text-[14px] font-bold tracking-[0.2em] uppercase text-gray-400">Model</p>
+            <h3 className="text-[22px] font-black uppercase truncate">{modelName}</h3>
+            <p className="text-[14px] font-bold tracking-[0.2em] uppercase text-gray-400 mt-2">Artist</p>
+            <p className="text-[18px] font-black uppercase truncate">{artistName || '—'}</p>
           </div>
 
-          <div className={cn('px-3 py-1 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase flex-shrink-0', statusClass)}>
+          <div className={cn('px-3 py-1 rounded-full text-[14px] font-bold tracking-[0.2em] uppercase flex-shrink-0', statusClass)}>
             {statusLabel}
           </div>
         </div>
 
         {visibleTags.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {visibleTags.map((tag) => (
+            {visibleTags.map((tag, i) => (
               <span
-                key={tag}
-                className="px-3 py-1 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase bg-gray-100 text-gray-700"
+                key={`${tag}-${i}`}
+                className="px-3 py-1 rounded-full text-[14px] font-bold tracking-[0.2em] uppercase bg-gray-100 text-gray-700"
               >
                 {tag}
               </span>
@@ -453,8 +525,8 @@ function ArtistCard({
         )}
 
         <div className="space-y-1">
-          <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400">Description</p>
-          <pre className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">
+          <p className="text-[14px] font-bold tracking-[0.2em] uppercase text-gray-400">Description</p>
+          <pre className="text-[16px] text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">
             {description?.length ? description : '—'}
           </pre>
         </div>

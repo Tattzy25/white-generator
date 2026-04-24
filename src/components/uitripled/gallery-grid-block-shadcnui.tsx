@@ -96,8 +96,8 @@ export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onS
                         {image.model_name}
                       </h3>
                       <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-                        {(image.tags || []).slice(0, 2).map((tag: string) => (
-                          <Badge key={tag} variant="secondary" className="uppercase text-[10px] tracking-wider">{tag}</Badge>
+                        {(image.tags || []).slice(0, 2).map((tag: string, i: number) => (
+                          <Badge key={`${tag}-${i}`} variant="secondary" className="uppercase text-[10px] tracking-wider">{tag}</Badge>
                         ))}
                       </div>
                     </motion.div>
@@ -183,8 +183,8 @@ export function GalleryGridBlock({ models, onSelectModel }: { models: any[], onS
                   <div className="absolute bottom-0 inset-x-0 p-8 bg-gradient-to-t from-black/80 to-transparent">
                     <h3 className="text-3xl font-bold text-white mb-2 uppercase">{selectedImageData.model_name}</h3>
                     <div className="flex gap-2">
-                      {(selectedImageData.tags || []).slice(0, 2).map((tag: string) => (
-                        <Badge key={tag} variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-none uppercase tracking-wider text-[10px]">{tag}</Badge>
+                      {(selectedImageData.tags || []).slice(0, 2).map((tag: string, i: number) => (
+                        <Badge key={`${tag}-${i}`} variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-none uppercase tracking-wider text-[10px]">{tag}</Badge>
                       ))}
                     </div>
                   </div>
